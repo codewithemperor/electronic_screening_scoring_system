@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/auth-context';
 import { 
   LayoutDashboard, 
   User, 
@@ -35,6 +36,11 @@ const navigation = [
 export function CandidateSidebar({ className }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+  };
 
   return (
     <>
@@ -101,6 +107,7 @@ export function CandidateSidebar({ className }: SidebarProps) {
             <Button
               variant="ghost"
               className="w-full justify-start text-gray-700 hover:text-gray-900"
+              onClick={handleLogout}
             >
               <LogOut className="mr-3 h-5 w-5" />
               Logout
@@ -174,6 +181,7 @@ export function CandidateSidebar({ className }: SidebarProps) {
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-gray-700 hover:text-gray-900"
+                  onClick={handleLogout}
                 >
                   <LogOut className="mr-3 h-5 w-5" />
                   Logout

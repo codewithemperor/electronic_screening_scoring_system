@@ -21,6 +21,7 @@ import {
   Mail
 } from 'lucide-react';
 import Link from 'next/link';
+import { api } from '@/lib/api-client';
 
 interface AdmissionStatus {
   status: 'ADMITTED' | 'IN_PROGRESS' | 'REJECTED' | 'NOT_ADMITTED';
@@ -63,43 +64,56 @@ export default function CandidateAdmissionPage() {
 
   const fetchAdmissionStatus = async () => {
     try {
-      // Mock data - in real app, fetch from API
-      const mockAdmissionStatus: AdmissionStatus = {
-        status: 'ADMITTED',
-        utmeScore: 265,
-        olevelAggregate: 28,
-        finalScore: 67,
+      setLoading(true);
+      
+      // Fetch candidate profile data
+      const profileResponse = await api.get('/api/candidate/profile');
+      if (!profileResponse.ok) throw new Error('Failed to fetch profile');
+      const profileData = await profileResponse.json();
+      
+      // Fetch admission recommendation
+      const admissionResponse = await api.post('/api/candidate/admission-recommendation');
+      if (!admissionResponse.ok) throw new Error('Failed to fetch admission data');
+      const admissionData = await admissionResponse.json();
+      
+      // Transform data to admission status format
+      const admissionStatus: AdmissionStatus = {
+        status: profileData.admissionStatus,
+        utmeScore: profileData.utmeScore,
+        olevelAggregate: profileData.olevelAggregate,
+        finalScore: profileData.finalScore,
         department: {
-          name: 'Computer Science',
-          code: 'CS',
-          utmeCutoff: 250,
-          olevelCutoff: 25,
-          finalCutoff: 55
+          name: profileData.department.name,
+          code: profileData.department.code,
+          utmeCutoff: profileData.department.utmeCutoffMark || 250,
+          olevelCutoff: profileData.department.olevelCutoffAggregate || 25,
+          finalCutoff: profileData.department.finalCutoffMark || 55
         },
-        testAttempts: [
-          {
-            id: '1',
-            title: 'Computer Science Aptitude Test',
-            score: 8,
-            totalMarks: 10,
-            status: 'COMPLETED',
-            completedAt: '2024-01-15T10:30:00Z'
-          }
-        ],
+        testAttempts: profileData.testAttempts
+          .filter((attempt: any) => attempt.status === 'COMPLETED' || attempt.status === 'SUBMITTED')
+          .map((attempt: any) => ({
+            id: attempt.id,
+            title: attempt.examination.title,
+            score: attempt.score || 0,
+            totalMarks: attempt.totalMarks || 100,
+            status: attempt.status,
+            completedAt: attempt.endTime || attempt.startTime
+          })),
         personalInfo: {
-          fullName: 'John Doe',
-          email: 'john.doe@email.com',
-          phone: '08012345678',
-          dateOfBirth: '2000-01-15',
-          address: '123 Lagos Street, Ikeja',
-          state: 'Lagos',
-          lga: 'Ikeja'
+          fullName: profileData.fullName,
+          email: profileData.email,
+          phone: profileData.phone,
+          dateOfBirth: profileData.dateOfBirth,
+          address: profileData.address,
+          state: profileData.state.name,
+          lga: profileData.lga.name
         }
       };
 
-      setAdmissionStatus(mockAdmissionStatus);
+      setAdmissionStatus(admissionStatus);
     } catch (error) {
       console.error('Error fetching admission status:', error);
+      setAdmissionStatus(null);
     } finally {
       setLoading(false);
     }

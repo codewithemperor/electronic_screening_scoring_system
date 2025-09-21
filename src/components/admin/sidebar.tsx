@@ -16,7 +16,8 @@ import {
   X,
   LogOut,
   TrendingUp,
-  Target
+  Target,
+  MapPin
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -27,6 +28,7 @@ interface SidebarProps {
 const navigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Departments', href: '/admin/departments', icon: Building2 },
+  { name: 'States', href: '/admin/states', icon: MapPin },
   { name: 'Questions', href: '/admin/questions', icon: BookOpen },
   { name: 'Examinations', href: '/admin/examinations', icon: FileText },
   { name: 'Candidates', href: '/admin/candidates', icon: Users },

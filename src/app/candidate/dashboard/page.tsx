@@ -20,6 +20,7 @@ import {
   Calendar
 } from 'lucide-react';
 import Link from 'next/link';
+import { api } from '@/lib/api-client';
 
 interface CandidateStats {
   utmeScore: number;
@@ -53,30 +54,67 @@ export default function CandidateDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate fetching candidate data
-    setTimeout(() => {
-      setStats({
-        utmeScore: 280,
-        olevelAggregate: 35,
-        finalScore: 78.5,
-        admissionStatus: 'IN_PROGRESS',
-        completedTests: 2,
-        pendingTests: 1,
-        totalTests: 3
-      });
-      
-      setUpcomingTests([
-        {
-          id: '1',
-          title: 'Computer Science Aptitude Test',
-          department: 'Computer Science',
-          date: '2024-01-15',
-          duration: 60
-        }
-      ]);
-      
-      setLoading(false);
-    }, 1000);
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch candidate profile data
+        const profileResponse = await api.get('/api/candidate/profile');
+        if (!profileResponse.ok) throw new Error('Failed to fetch profile');
+        const profileData = await profileResponse.json();
+        
+        // Fetch dashboard stats
+        const statsResponse = await api.get('/api/candidate/dashboard/stats');
+        if (!statsResponse.ok) throw new Error('Failed to fetch stats');
+        const statsData = await statsResponse.json();
+        
+        // Fetch upcoming tests
+        const testsResponse = await api.get('/api/candidate/tests');
+        if (!testsResponse.ok) throw new Error('Failed to fetch tests');
+        const testsData = await testsResponse.json();
+        
+        // Set stats from profile and dashboard data
+        setStats({
+          utmeScore: profileData.utmeScore,
+          olevelAggregate: profileData.olevelAggregate,
+          finalScore: profileData.finalScore,
+          admissionStatus: profileData.admissionStatus,
+          completedTests: statsData.completedTests || 0,
+          pendingTests: (statsData.totalTests || 0) - (statsData.completedTests || 0),
+          totalTests: statsData.totalTests || 0
+        });
+        
+        // Set upcoming tests (filter for pending tests)
+        const pendingTests = testsData.filter((test: any) => 
+          test.status === 'PENDING' || test.status === 'ASSIGNED'
+        );
+        setUpcomingTests(pendingTests.map((test: any) => ({
+          id: test.id,
+          title: test.examination.title,
+          department: test.examination.department.name,
+          date: test.startTime,
+          duration: test.examination.duration || 60
+        })));
+        
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        // Set default values on error
+        setStats({
+          utmeScore: 0,
+          olevelAggregate: 0,
+          finalScore: 0,
+          admissionStatus: 'NOT_ADMITTED',
+          completedTests: 0,
+          pendingTests: 0,
+          totalTests: 0
+        });
+        setUpcomingTests([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDashboardData();
   }, []);
 
   const getAdmissionStatusColor = (status: string) => {
@@ -245,7 +283,7 @@ export default function CandidateDashboard() {
                           </div>
                         </div>
                         <Button size="sm" asChild>
-                          <Link href={`/candidate/examinations/${test.id}`}>
+                          <Link href={`/candidate/exam/${test.id}`}>
                             Start Test
                           </Link>
                         </Button>

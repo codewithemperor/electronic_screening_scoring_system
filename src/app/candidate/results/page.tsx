@@ -19,6 +19,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
+import { api } from '@/lib/api-client';
 
 interface TestResult {
   id: string;
@@ -55,37 +56,53 @@ export default function CandidateResultsPage() {
 
   const fetchResults = async () => {
     try {
-      // Mock data - in real app, fetch from API
-      const mockTestResults: TestResult[] = [
-        {
-          id: '1',
-          title: 'Computer Science Aptitude Test',
-          department: 'Computer Science',
-          score: 8,
-          totalMarks: 10,
-          percentage: 80,
-          status: 'COMPLETED',
-          date: '2024-01-15',
-          duration: 120
-        }
-      ];
+      setLoading(true);
+      
+      // Fetch candidate profile data
+      const profileResponse = await api.get('/api/candidate/profile');
+      if (!profileResponse.ok) throw new Error('Failed to fetch profile');
+      const profileData = await profileResponse.json();
+      
+      // Fetch admission recommendation
+      const admissionResponse = await api.post('/api/candidate/admission-recommendation', {});
+      if (!admissionResponse.ok) throw new Error('Failed to fetch admission data');
+      const admissionData = await admissionResponse.json();
+      
+      // Transform test attempts to results format
+      const testResults: TestResult[] = profileData.testAttempts
+        .filter((attempt: any) => attempt.status === 'COMPLETED' || attempt.status === 'SUBMITTED')
+        .map((attempt: any) => ({
+          id: attempt.id,
+          title: attempt.examination.title,
+          department: attempt.examination.department?.name || 'Unknown Department',
+          score: attempt.score || 0,
+          totalMarks: attempt.totalMarks || 100,
+          percentage: attempt.score ? Math.round((attempt.score / attempt.totalMarks) * 100) : 0,
+          status: attempt.status,
+          date: attempt.startTime,
+          duration: 60 // default duration
+        }));
 
-      const mockAdmissionInfo: AdmissionInfo = {
-        utmeScore: 265,
-        olevelAggregate: 28,
-        finalScore: 67,
-        admissionStatus: 'ADMITTED',
+      // Set admission info
+      const currentDeptRecommendation = admissionData.recommendations.find((r: any) => r.isCurrentDepartment);
+      setAdmissionInfo({
+        utmeScore: profileData.utmeScore,
+        olevelAggregate: profileData.olevelAggregate,
+        finalScore: currentDeptRecommendation?.scores.finalScore,
+        admissionStatus: profileData.admissionStatus,
         departmentCutoff: {
-          utme: 250,
-          olevel: 25,
-          final: 55
+          utme: currentDeptRecommendation?.requirements.utmeCutoff || 250,
+          olevel: currentDeptRecommendation?.requirements.olevelCutoff || 25,
+          final: currentDeptRecommendation?.requirements.finalCutoff || 55
         }
-      };
+      });
 
-      setTestResults(mockTestResults);
-      setAdmissionInfo(mockAdmissionInfo);
+      setTestResults(testResults);
     } catch (error) {
       console.error('Error fetching results:', error);
+      // Set default values on error
+      setTestResults([]);
+      setAdmissionInfo(null);
     } finally {
       setLoading(false);
     }

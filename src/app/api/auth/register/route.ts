@@ -54,6 +54,17 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    // Calculate O'Level aggregate from the results
+    let olevelAggregate = 0;
+    const gradingRules = await db.gradingRule.findMany();
+    
+    for (const result of validatedData.academicDetails.oLevelResults) {
+      const gradingRule = gradingRules.find(rule => rule.grade === result.grade);
+      if (gradingRule) {
+        olevelAggregate += gradingRule.marks;
+      }
+    }
+
     // Create candidate
     const candidate = await db.candidate.create({
       data: {
@@ -66,7 +77,7 @@ export async function POST(request: NextRequest) {
         lgaId: validatedData.personalDetails.lgaId,
         utmeScore: validatedData.academicDetails.utmeScore,
         departmentId: validatedData.academicDetails.departmentId,
-        olevelAggregate: 0 // Will be calculated when O'Level results are added
+        olevelAggregate: olevelAggregate
       }
     });
 
@@ -100,10 +111,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Assign departmental tests to the new candidate
+    const departmentExaminations = await db.examination.findMany({
+      where: {
+        departmentId: validatedData.academicDetails.departmentId,
+        isActive: true
+      }
+    });
+
+    console.log(`Found ${departmentExaminations.length} active examinations for department`);
+
+    for (const examination of departmentExaminations) {
+      // Check if examination has questions before assigning
+      const questionCount = await db.examinationQuestion.count({
+        where: {
+          examinationId: examination.id
+        }
+      });
+
+      if (questionCount > 0) {
+        await db.testAttempt.create({
+          data: {
+            candidateId: candidate.id,
+            examinationId: examination.id,
+            startTime: new Date(),
+            status: 'PENDING',
+            totalMarks: examination.totalMarks
+          }
+        });
+        console.log(`Assigned test: ${examination.title} to candidate: ${candidate.fullName}`);
+      } else {
+        console.log(`Skipped examination ${examination.title} - no questions available`);
+      }
+    }
+
     return NextResponse.json({
       message: 'Registration successful',
       userId: user.id,
-      candidateId: candidate.id
+      candidateId: candidate.id,
+      testsAssigned: departmentExaminations.length
     });
   } catch (error) {
     console.error('Registration error:', error);

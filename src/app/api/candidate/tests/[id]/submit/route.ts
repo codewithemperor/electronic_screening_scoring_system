@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 
 // Zod schema for test submission
 const submitSchema = z.object({
-  answers: z.record(z.number().min(0).max(3)) // questionIndex: answerIndex (0-3)
+  answers: z.record(z.string(), z.number().min(0).max(3)) // questionIndex (string): answerIndex (0-3)
 });
 
 export async function POST(
@@ -13,7 +13,14 @@ export async function POST(
 ) {
   try {
     const body = await request.json();
+    
+    // Log the received data for debugging
+    console.log('📤 Received test submission data:', JSON.stringify(body, null, 2));
+    
     const validatedData = submitSchema.parse(body);
+    
+    // Log the validated data
+    console.log('✅ Validated data:', JSON.stringify(validatedData, null, 2));
 
     // Get test attempt with questions
     const testAttempt = await db.testAttempt.findUnique({
@@ -114,14 +121,19 @@ export async function POST(
     console.error('Error submitting test:', error);
     
     if (error instanceof z.ZodError) {
+      console.error('Zod validation error details:', error.errors);
       return NextResponse.json(
-        { error: 'Invalid submission data', details: error.errors },
+        { 
+          error: 'Invalid submission data', 
+          details: error.errors,
+          message: `Validation failed. Please check your answers and try again.`
+        },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: 'Failed to submit test' },
+      { error: 'Failed to submit test', message: error.message },
       { status: 500 }
     );
   }

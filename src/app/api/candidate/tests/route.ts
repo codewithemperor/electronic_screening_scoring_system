@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getAuthenticatedCandidate, requireAuth } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // For demo purposes, we'll get test attempts for the first candidate
-    // In a real app, you would get the candidate ID from the authenticated user
-    const candidate = await db.candidate.findFirst();
-    
+    // Check authentication
+    const auth = await requireAuth(request, 'CANDIDATE');
+    if (!auth.success) {
+      return NextResponse.json(
+        { error: auth.error },
+        { status: auth.status }
+      );
+    }
+
+    // Get the authenticated candidate
+    const candidate = await getAuthenticatedCandidate(request);
+
     if (!candidate) {
       return NextResponse.json([]);
     }

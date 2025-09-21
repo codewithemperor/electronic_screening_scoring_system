@@ -21,6 +21,7 @@ import {
   SkipBack
 } from 'lucide-react';
 import Link from 'next/link';
+import { api } from '@/lib/api-client';
 
 interface Question {
   id: string;
@@ -100,8 +101,8 @@ export default function ExamPage({ params }: { params: { id: string } }) {
 
     try {
       const [testResponse, questionsResponse] = await Promise.all([
-        fetch(`/api/candidate/tests/${params.id}`),
-        fetch(`/api/candidate/tests/${params.id}/questions`)
+        api.get(`/api/candidate/tests/${params.id}`),
+        api.get(`/api/candidate/tests/${params.id}/questions`)
       ]);
 
       if (!testResponse.ok) throw new Error('Failed to fetch test data');
@@ -129,9 +130,7 @@ export default function ExamPage({ params }: { params: { id: string } }) {
 
   const startTest = async () => {
     try {
-      const response = await fetch(`/api/candidate/tests/${params.id}/start`, {
-        method: 'POST'
-      });
+      const response = await api.post(`/api/candidate/tests/${params.id}/start`);
 
       if (!response.ok) throw new Error('Failed to start test');
 
@@ -177,12 +176,8 @@ export default function ExamPage({ params }: { params: { id: string } }) {
     setExamState(prev => ({ ...prev, isSubmitting: true }));
 
     try {
-      const response = await fetch(`/api/candidate/tests/${params.id}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          answers: examState.answers
-        })
+      const response = await api.post(`/api/candidate/tests/${params.id}/submit`, {
+        answers: examState.answers
       });
 
       if (!response.ok) throw new Error('Failed to submit test');

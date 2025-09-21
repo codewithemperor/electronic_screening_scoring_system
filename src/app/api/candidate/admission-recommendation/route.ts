@@ -1,38 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getAuthenticatedCandidate, requireAuth } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { candidateId } = body;
-
-    if (!candidateId) {
+    // Check authentication
+    const auth = await requireAuth(request, 'CANDIDATE');
+    if (!auth.success) {
       return NextResponse.json(
-        { error: 'Candidate ID is required' },
-        { status: 400 }
+        { error: auth.error },
+        { status: auth.status }
       );
     }
 
-    // Get candidate with current department and all departments
-    const candidate = await db.candidate.findUnique({
-      where: { id: candidateId },
-      include: {
-        department: true,
-        oLevelResults: {
-          include: {
-            gradingRule: true
-          }
-        },
-        testAttempts: {
-          where: {
-            status: 'SUBMITTED'
-          },
-          include: {
-            examination: true
-          }
-        }
-      }
-    });
+    // Get the authenticated candidate
+    const candidate = await getAuthenticatedCandidate(request);
 
     if (!candidate) {
       return NextResponse.json(
@@ -48,10 +30,17 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    // Calculate O'Level aggregate from actual results
+    let olevelAggregate = 0;
+    candidate.oLevelResults.forEach(result => {
+      if (result.gradingRule) {
+        olevelAggregate += result.gradingRule.marks;
+      }
+    });
+
     // Calculate O'Level percentage score
-    const olevelTotalMarks = candidate.olevelAggregate;
-    const maxOlevelMarks = 45; // Maximum possible O'Level aggregate
-    const olevelPercentage = Math.round((olevelTotalMarks / maxOlevelMarks) * 100);
+    const maxOlevelMarks = 45; // Maximum possible O'Level aggregate (5 subjects × 9 marks each)
+    const olevelPercentage = Math.round((olevelAggregate / maxOlevelMarks) * 100);
 
     // Calculate exam percentage score
     let examTotalMarks = 0;
@@ -78,7 +67,7 @@ export async function POST(request: NextRequest) {
 
       // Check requirements
       const meetsUtmeCutoff = candidate.utmeScore >= dept.utmeCutoffMark;
-      const meetsOlevelCutoff = candidate.olevelAggregate >= dept.olevelCutoffAggregate;
+      const meetsOlevelCutoff = olevelAggregate >= dept.olevelCutoffAggregate;
       const meetsFinalCutoff = finalScore >= dept.finalCutoffMark;
 
       // Determine eligibility and recommendation

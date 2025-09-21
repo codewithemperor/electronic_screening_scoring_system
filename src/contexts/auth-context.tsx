@@ -86,10 +86,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    // In a real app, you might also want to invalidate the token on the server
+  const logout = async () => {
+    try {
+      // Call logout API to invalidate session on server
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error) {
+      console.error('Logout API call failed:', error);
+    } finally {
+      // Clear client-side state regardless of API call success
+      setUser(null);
+      localStorage.removeItem('user');
+      
+      // Redirect to candidate login page
+      window.location.href = '/candidate/login';
+    }
   };
 
   const value = {

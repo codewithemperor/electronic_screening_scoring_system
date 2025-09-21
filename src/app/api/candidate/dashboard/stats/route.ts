@@ -1,18 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getAuthenticatedCandidate, requireAuth } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // For demo purposes, we'll get stats for the first candidate
-    // In a real app, you would get the candidate ID from the authenticated user
-    const candidate = await db.candidate.findFirst();
-    
+    // Check authentication
+    const auth = await requireAuth(request, 'CANDIDATE');
+    if (!auth.success) {
+      return NextResponse.json(
+        { error: auth.error },
+        { status: auth.status }
+      );
+    }
+
+    // Get the authenticated candidate
+    const candidate = await getAuthenticatedCandidate(request);
+
     if (!candidate) {
       return NextResponse.json({
         totalTests: 0,
         completedTests: 0,
         averageScore: 0,
-        admissionProgress: 0
+        admissionProgress: 0,
+        utmeScore: 0,
+        olevelAggregate: 0,
+        finalScore: 0
       });
     }
 
@@ -69,7 +81,10 @@ export async function GET() {
       totalTests,
       completedTests,
       averageScore,
-      admissionProgress
+      admissionProgress,
+      utmeScore: candidate.utmeScore,
+      olevelAggregate: candidate.olevelAggregate,
+      finalScore: candidate.finalScore
     });
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);

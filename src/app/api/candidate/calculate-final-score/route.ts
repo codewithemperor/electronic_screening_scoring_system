@@ -41,30 +41,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate O'Level percentage score
-    // Get the maximum possible O'Level score based on grading rules
-    const gradingRules = await db.gradingRule.findMany({
-      orderBy: { marks: 'desc' }
-    });
-    
-    const maxGradeScore = Math.max(...gradingRules.map(rule => rule.marks));
-    const maxPossibleScore = maxGradeScore * 9; // Assuming 9 subjects maximum
-    
-    // Calculate actual O'Level percentage based on real grading data
-    let totalObtainedMarks = 0;
-    let totalPossibleMarks = 0;
-    
+    // Calculate O'Level aggregate from actual results
+    let olevelAggregate = 0;
     candidate.oLevelResults.forEach(result => {
       if (result.gradingRule) {
-        totalObtainedMarks += result.gradingRule.marks;
-        totalPossibleMarks += maxGradeScore;
+        olevelAggregate += result.gradingRule.marks;
       }
     });
-    
-    // If no O'Level results, use the stored aggregate
-    const olevelPercentage = totalPossibleMarks > 0 
-      ? Math.round((totalObtainedMarks / totalPossibleMarks) * 100)
-      : Math.round((candidate.olevelAggregate / maxPossibleScore) * 100);
+
+    // Calculate O'Level percentage score
+    const maxOlevelMarks = 45; // Maximum possible O'Level aggregate (5 subjects × 9 marks each)
+    const olevelPercentage = Math.round((olevelAggregate / maxOlevelMarks) * 100);
 
     // Calculate exam percentage score
     let examTotalMarks = 0;
@@ -93,7 +80,7 @@ export async function POST(request: NextRequest) {
     
     // Check if candidate meets minimum requirements
     const meetsUtmeCutoff = candidate.utmeScore >= department.utmeCutoffMark;
-    const meetsOlevelCutoff = candidate.olevelAggregate >= department.olevelCutoffAggregate;
+    const meetsOlevelCutoff = olevelAggregate >= department.olevelCutoffAggregate;
     const meetsFinalCutoff = finalScore >= department.finalCutoffMark;
 
     if (!meetsUtmeCutoff || !meetsOlevelCutoff) {
@@ -108,6 +95,7 @@ export async function POST(request: NextRequest) {
     const updatedCandidate = await db.candidate.update({
       where: { id: candidateId },
       data: {
+        olevelAggregate, // Update the stored aggregate with calculated value
         olevelPercentage,
         examPercentage,
         finalScore,
@@ -121,7 +109,7 @@ export async function POST(request: NextRequest) {
         id: updatedCandidate.id,
         fullName: updatedCandidate.fullName,
         utmeScore: updatedCandidate.utmeScore,
-        olevelAggregate: updatedCandidate.olevelAggregate,
+        olevelAggregate: olevelAggregate, // Use the calculated value
         olevelPercentage,
         examPercentage,
         finalScore,

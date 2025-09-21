@@ -28,6 +28,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import Link from 'next/link';
+import { api } from '@/lib/api-client';
 
 interface Candidate {
   id: string;
@@ -135,11 +136,53 @@ export default function CandidateProfilePage() {
     setError(null);
 
     try {
-      const response = await fetch('/api/candidate/profile');
+      const response = await api.get('/api/candidate/profile');
       if (!response.ok) throw new Error('Failed to fetch profile');
       
       const data = await response.json();
-      setCandidate(data);
+      
+      // Calculate performance percentages
+      let examPercentage = 0;
+      let olevelPercentage = 0;
+      let finalScore = 0;
+      
+      // Calculate exam percentage from test attempts
+      if (data.testAttempts && data.testAttempts.length > 0) {
+        const submittedAttempts = data.testAttempts.filter(
+          (attempt: any) => attempt.status === 'SUBMITTED' || attempt.status === 'COMPLETED'
+        );
+        
+        if (submittedAttempts.length > 0) {
+          const totalScore = submittedAttempts.reduce(
+            (sum: number, attempt: any) => sum + (attempt.score || 0), 
+            0
+          );
+          const totalPossible = submittedAttempts.reduce(
+            (sum: number, attempt: any) => sum + (attempt.totalMarks || 100), 
+            0
+          );
+          examPercentage = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0;
+        }
+      }
+      
+      // Calculate O'Level percentage
+      if (data.olevelAggregate !== undefined) {
+        olevelPercentage = Math.round((data.olevelAggregate / 45) * 100);
+      }
+      
+      // Calculate final score (UTME 40%, O'Level 30%, Exam 30%)
+      const utmePercentage = data.utmeScore ? Math.round((data.utmeScore / 400) * 100) : 0;
+      finalScore = Math.round((utmePercentage * 0.4) + (olevelPercentage * 0.3) + (examPercentage * 0.3));
+      
+      // Add calculated values to data
+      const enrichedData = {
+        ...data,
+        examPercentage,
+        olevelPercentage,
+        finalScore
+      };
+      
+      setCandidate(enrichedData);
       
       // Initialize edit form
       setEditForm({
@@ -164,8 +207,8 @@ export default function CandidateProfilePage() {
   const fetchReferenceData = async () => {
     try {
       const [statesResponse, departmentsResponse] = await Promise.all([
-        fetch('/api/states'),
-        fetch('/api/departments')
+        api.get('/api/states'),
+        api.get('/api/departments')
       ]);
 
       if (statesResponse.ok) {
@@ -184,7 +227,7 @@ export default function CandidateProfilePage() {
 
   const fetchLgas = async (stateId: string) => {
     try {
-      const response = await fetch(`/api/lgas/${stateId}`);
+      const response = await api.get(`/api/lgas/${stateId}`);
       if (response.ok) {
         const lgasData = await response.json();
         setLgas(lgasData);
@@ -196,11 +239,7 @@ export default function CandidateProfilePage() {
 
   const handleUpdateProfile = async () => {
     try {
-      const response = await fetch('/api/candidate/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm)
-      });
+      const response = await api.put('/api/candidate/profile', editForm);
 
       if (!response.ok) throw new Error('Failed to update profile');
 
@@ -270,8 +309,7 @@ export default function CandidateProfilePage() {
       <div className="p-6">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4">
               <Button variant="outline" size="sm" asChild>
                 <Link href="/candidate/dashboard">
                   <ArrowLeft className="mr-2 h-4 w-4" />
@@ -282,182 +320,180 @@ export default function CandidateProfilePage() {
               <Badge variant="outline" className="text-sm">
                 {candidate.department.name}
               </Badge>
+              <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Profile
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Edit Profile</DialogTitle>
+                    <DialogDescription>
+                      Update your personal and academic information
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="fullName">Full Name</Label>
+                        <Input
+                          id="fullName"
+                          value={editForm.fullName}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, fullName: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          value={editForm.phone}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="address">Address</Label>
+                      <Textarea
+                        id="address"
+                        value={editForm.address}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                        <Input
+                          id="dateOfBirth"
+                          type="date"
+                          value={editForm.dateOfBirth}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="state">State</Label>
+                        <Select 
+                          value={editForm.stateId} 
+                          onValueChange={(value) => {
+                            setEditForm(prev => ({ ...prev, stateId: value }));
+                            fetchLgas(value);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select state" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {states.map(state => (
+                              <SelectItem key={state.id} value={state.id}>
+                                {state.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="lga">LGA</Label>
+                        <Select 
+                          value={editForm.lgaId} 
+                          onValueChange={(value) => setEditForm(prev => ({ ...prev, lgaId: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select LGA" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {lgas.map(lga => (
+                              <SelectItem key={lga.id} value={lga.id}>
+                                {lga.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="department">Department</Label>
+                        <Select 
+                          value={editForm.departmentId} 
+                          onValueChange={(value) => setEditForm(prev => ({ ...prev, departmentId: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {departments.map(dept => (
+                              <SelectItem key={dept.id} value={dept.id}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="utmeScore">UTME Score</Label>
+                        <Input
+                          id="utmeScore"
+                          type="number"
+                          min="0"
+                          max="400"
+                          value={editForm.utmeScore}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, utmeScore: parseInt(e.target.value) || 0 }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="olevelAggregate">O'Level Aggregate</Label>
+                        <Input
+                          id="olevelAggregate"
+                          type="number"
+                          min="0"
+                          max="45"
+                          value={editForm.olevelAggregate}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, olevelAggregate: parseInt(e.target.value) || 0 }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {error && (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsEditing(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleUpdateProfile} className="electric-glow">
+                      Update Profile
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-            <Dialog open={isEditing} onOpenChange={setIsEditing}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Profile
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Edit Profile</DialogTitle>
-                  <DialogDescription>
-                    Update your personal and academic information
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="fullName">Full Name</Label>
-                      <Input
-                        id="fullName"
-                        value={editForm.fullName}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, fullName: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        value={editForm.phone}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="address">Address</Label>
-                    <Textarea
-                      id="address"
-                      value={editForm.address}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                      <Input
-                        id="dateOfBirth"
-                        type="date"
-                        value={editForm.dateOfBirth}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="state">State</Label>
-                      <Select 
-                        value={editForm.stateId} 
-                        onValueChange={(value) => {
-                          setEditForm(prev => ({ ...prev, stateId: value }));
-                          fetchLgas(value);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select state" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {states.map(state => (
-                            <SelectItem key={state.id} value={state.id}>
-                              {state.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="lga">LGA</Label>
-                      <Select 
-                        value={editForm.lgaId} 
-                        onValueChange={(value) => setEditForm(prev => ({ ...prev, lgaId: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select LGA" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {lgas.map(lga => (
-                            <SelectItem key={lga.id} value={lga.id}>
-                              {lga.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="department">Department</Label>
-                      <Select 
-                        value={editForm.departmentId} 
-                        onValueChange={(value) => setEditForm(prev => ({ ...prev, departmentId: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departments.map(dept => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="utmeScore">UTME Score</Label>
-                      <Input
-                        id="utmeScore"
-                        type="number"
-                        min="0"
-                        max="400"
-                        value={editForm.utmeScore}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, utmeScore: parseInt(e.target.value) || 0 }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="olevelAggregate">O'Level Aggregate</Label>
-                      <Input
-                        id="olevelAggregate"
-                        type="number"
-                        min="0"
-                        max="45"
-                        value={editForm.olevelAggregate}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, olevelAggregate: parseInt(e.target.value) || 0 }))}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {error && (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleUpdateProfile} className="electric-glow">
-                    Update Profile
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
-      </header>
 
-      <div className="container mx-auto px-4 py-8">
-        {error && (
-          <Alert className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <div className="container mx-auto px-4 py-8">
+          {error && (
+            <Alert className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Profile Information */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Profile Information */}
+            <div className="lg:col-span-2 space-y-6">
             {/* Personal Information */}
             <Card className="electric-border">
               <CardHeader>
@@ -611,7 +647,7 @@ export default function CandidateProfilePage() {
                         <div>
                           <h4 className="font-medium">{attempt.examination.title}</h4>
                           <p className="text-sm text-muted-foreground">
-                            {attempt.examination.department.name}
+                            {attempt.examination.department?.name || 'Unknown Department'}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(attempt.startTime).toLocaleDateString()}

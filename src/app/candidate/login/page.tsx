@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Eye, EyeOff, GraduationCap } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function CandidateLogin() {
   const [formData, setFormData] = useState({
@@ -17,37 +18,20 @@ export default function CandidateLogin() {
     rememberMe: false
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { login, isLoading } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
+    const success = await login(formData.email, formData.password);
+    
+    if (success) {
       // Redirect to dashboard on success
       window.location.href = '/candidate/dashboard';
-    } catch (err) {
-      setError(err.message);
-      console.error('Login error:', err);
-    } finally {
-      setLoading(false);
+    } else {
+      setError('Invalid email or password');
     }
   };
 
@@ -146,9 +130,9 @@ export default function CandidateLogin() {
               <Button 
                 type="submit" 
                 className="w-full electric-glow"
-                disabled={loading || !formData.email || !formData.password}
+                disabled={isLoading || !formData.email || !formData.password}
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {isLoading ? 'Signing in...' : 'Sign In'}
               </Button>
             </form>
 

@@ -1,68 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getAuthenticatedCandidate, requireAuth } from '@/lib/auth';
 
-// This is a simplified version - in a real app, you would get the candidate ID from the session/JWT
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // For demo purposes, we'll get the first candidate
-    // In a real app, you would get the candidate ID from the authenticated user
-    const candidate = await db.candidate.findFirst({
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true
-          }
-        },
-        department: {
-          select: {
-            name: true,
-            code: true
-          }
-        },
-        state: {
-          select: {
-            name: true
-          }
-        },
-        lga: {
-          select: {
-            name: true
-          }
-        },
-        oLevelResults: {
-          include: {
-            subject: {
-              select: {
-                name: true
-              }
-            },
-            gradingRule: {
-              select: {
-                grade: true,
-                marks: true
-              }
-            }
-          }
-        },
-        testAttempts: {
-          include: {
-            examination: {
-              select: {
-                title: true,
-                totalMarks: true
-              }
-            }
-          }
-        }
-      }
-    });
+    // Check authentication
+    const auth = await requireAuth(request, 'CANDIDATE');
+    if (!auth.success) {
+      return NextResponse.json(
+        { error: auth.error },
+        { status: auth.status }
+      );
+    }
+
+    // Get the authenticated candidate
+    const candidate = await getAuthenticatedCandidate(request);
 
     if (!candidate) {
       return NextResponse.json(
         { error: 'Candidate not found' },
         { status: 404 }
       );
+    }
+
+    // Calculate O'Level aggregate dynamically from results
+    let calculatedOlevelAggregate = 0;
+    candidate.oLevelResults.forEach(result => {
+      if (result.gradingRule) {
+        calculatedOlevelAggregate += result.gradingRule.marks;
+      }
+    });
+
+    // Update the candidate's O'Level aggregate if it's different
+    if (candidate.olevelAggregate !== calculatedOlevelAggregate) {
+      await db.candidate.update({
+        where: { id: candidate.id },
+        data: { olevelAggregate: calculatedOlevelAggregate }
+      });
+      candidate.olevelAggregate = calculatedOlevelAggregate;
     }
 
     return NextResponse.json(candidate);
