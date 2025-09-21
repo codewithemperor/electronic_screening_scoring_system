@@ -1,0 +1,325 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Authentication Models
+enum UserRole {
+  CANDIDATE
+  ADMIN
+}
+
+enum AdmissionStatus {
+  NOT_ADMITTED
+  IN_PROGRESS
+  ADMITTED
+  REJECTED
+}
+
+enum DepartmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ExamType {
+  WAEC
+  NECO
+  GCE
+}
+
+enum TestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SUBMITTED
+}
+
+// User Model (for authentication)
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      UserRole @default(CANDIDATE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidate Candidate?
+  admin    Admin?
+
+  @@map("users")
+}
+
+// Nigerian States Model
+model State {
+  id          String @id @default(cuid())
+  name        String @unique
+  code        String @unique
+  
+  lgas        Lga[]
+  candidates  Candidate[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("states")
+}
+
+// Local Government Areas Model
+model Lga {
+  id       String @id @default(cuid())
+  name     String
+  stateId  String
+  code     String
+  
+  state    State   @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  candidates Candidate[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, stateId])
+  @@map("lgas")
+}
+
+// O'Level Subjects Model
+model Subject {
+  id        String @id @default(cuid())
+  name      String @unique
+  code      String @unique
+  
+  oLevelResults OLevelResult[]
+  questions     Question[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subjects")
+}
+
+// O'Level Grading Rules Model
+model GradingRule {
+  id    String @id @default(cuid())
+  grade String @unique // A1, B2, B3, C4, C5, C6, D7, E8, F9
+  marks Int    // 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 respectively
+  
+  oLevelResults OLevelResult[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("grading_rules")
+}
+
+// Departments Model
+model Department {
+  id                   String           @id @default(cuid())
+  name                 String
+  code                 String           @unique
+  description          String?
+  
+  // Grading configuration
+  examPercentage       Int              @default(70) // Percentage weight for exam score
+  olevelPercentage     Int              @default(30) // Percentage weight for O'Level score
+  
+  // Cut-off marks
+  finalCutoffMark      Int              // Final combined score cut-off (0-100)
+  utmeCutoffMark       Int              // UTME score cut-off (0-400)
+  olevelCutoffAggregate Int            // O'Level aggregate cut-off (0-45)
+  
+  status               DepartmentStatus @default(ACTIVE)
+  
+  // Relations
+  candidates           Candidate[]
+  questions            Question[]
+  examinations         Examination[]
+  
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@unique([name, code])
+  @@map("departments")
+}
+
+// Candidate Model
+model Candidate {
+  id                   String           @id @default(cuid())
+  userId               String           @unique
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Personal Information
+  fullName             String
+  phone                String
+  dateOfBirth          DateTime
+  address              String
+  stateId              String
+  state                State            @relation(fields: [stateId], references: [id])
+  lgaId                String
+  lga                  Lga              @relation(fields: [lgaId], references: [id])
+  
+  // Academic Information
+  utmeScore            Int
+  departmentId         String
+  department           Department       @relation(fields: [departmentId], references: [id])
+  
+  // Calculated Scores
+  olevelAggregate      Int              // Calculated from O'Level results
+  olevelPercentage     Int?             // Final O'Level percentage score
+  examPercentage       Int?             // Final exam percentage score
+  finalScore           Int?             // Combined final score
+  admissionStatus      AdmissionStatus  @default(NOT_ADMITTED)
+  
+  // Relations
+  oLevelResults        OLevelResult[]
+  testAttempts         TestAttempt[]
+  
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@map("candidates")
+}
+
+// O'Level Results Model
+model OLevelResult {
+  id           String   @id @default(cuid())
+  candidateId  String
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  subjectId    String
+  subject      Subject   @relation(fields: [subjectId], references: [id])
+  grade        String
+  gradingRuleId String
+  gradingRule  GradingRule @relation(fields: [gradingRuleId], references: [id])
+  
+  schoolName   String
+  examYear     Int
+  examType     ExamType
+  regNumber    String
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([candidateId, subjectId])
+  @@map("o_level_results")
+}
+
+// Questions Model
+model Question {
+  id           String   @id @default(cuid())
+  content      String
+  options      String   // JSON string of options array
+  correctAnswer Int     // Index of correct answer (0, 1, 2, 3)
+  marks        Int      @default(1)
+  difficulty   Int?     // 1-5 scale
+  
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  subjectId    String
+  subject      Subject    @relation(fields: [subjectId], references: [id])
+  
+  examinationQuestions ExaminationQuestion[]
+  testAnswers          TestAnswer[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("questions")
+}
+
+// Examinations Model
+model Examination {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  duration      Int      // Duration in minutes
+  totalMarks    Int
+  passingMarks  Int
+  
+  departmentId  String
+  department    Department @relation(fields: [departmentId], references: [id])
+  
+  isActive      Boolean  @default(true)
+  
+  examinationQuestions ExaminationQuestion[]
+  testAttempts         TestAttempt[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("examinations")
+}
+
+// Examination-Question Many-to-Many Relationship
+model ExaminationQuestion {
+  id           String @id @default(cuid())
+  examinationId String
+  examination  Examination @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime @default(now())
+
+  @@unique([examinationId, questionId])
+  @@map("examination_questions")
+}
+
+// Test Attempts Model
+model TestAttempt {
+  id           String     @id @default(cuid())
+  candidateId  String
+  candidate    Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  examinationId String
+  examination  Examination @relation(fields: [examinationId], references: [id])
+  
+  startTime    DateTime
+  endTime      DateTime?
+  score        Int?
+  totalMarks   Int
+  status       TestStatus @default(PENDING)
+  
+  testAnswers  TestAnswer[]
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("test_attempts")
+}
+
+// Test Answers Model
+model TestAnswer {
+  id           String @id @default(cuid())
+  testAttemptId String
+  testAttempt   TestAttempt @relation(fields: [testAttemptId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      Question    @relation(fields: [questionId], references: [id])
+  
+  selectedAnswer Int?  // Index of selected answer
+  isCorrect      Boolean?
+  marksObtained  Int?  @default(0)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([testAttemptId, questionId])
+  @@map("test_answers")
+}
+
+// Admin Model
+model Admin {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  role      String?  @default("admin")
+  isActive  Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("admins")
+}
