@@ -29,8 +29,6 @@ const navigation = [
   { name: 'Profile', href: '/candidate/profile', icon: User },
   { name: 'Results', href: '/candidate/results', icon: FileText },
   { name: 'Admission Status', href: '/candidate/admission', icon: Target },
-  { name: 'Notifications', href: '/candidate/notifications', icon: Bell },
-  { name: 'Settings', href: '/candidate/settings', icon: Award },
 ];
 
 export function CandidateSidebar({ className }: SidebarProps) {
