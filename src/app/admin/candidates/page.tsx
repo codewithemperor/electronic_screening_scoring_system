@@ -319,7 +319,8 @@ export default function CandidatesPage() {
                             <Eye className="h-4 w-4" />
                           </Link>
                         </Button>
-                        {candidate.admissionStatus === 'IN_PROGRESS' && (
+                        {(candidate.admissionStatus === 'IN_PROGRESS' || 
+                          (candidate.admissionStatus === 'NOT_ADMITTED' && candidate.testAttempts.length > 0)) && (
                           <>
                             <Button 
                               size="sm" 

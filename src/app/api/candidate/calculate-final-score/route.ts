@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         },
         testAttempts: {
           where: {
-            status: 'COMPLETED'
+            status: 'SUBMITTED'
           },
           include: {
             examination: true
@@ -83,8 +83,13 @@ export async function POST(request: NextRequest) {
     const meetsOlevelCutoff = olevelAggregate >= department.olevelCutoffAggregate;
     const meetsFinalCutoff = finalScore >= department.finalCutoffMark;
 
-    if (!meetsUtmeCutoff || !meetsOlevelCutoff) {
+    // If candidate has submitted at least one test, they should be IN_PROGRESS
+    const hasSubmittedTest = candidate.testAttempts.length > 0;
+
+    if (!hasSubmittedTest) {
       admissionStatus = 'NOT_ADMITTED';
+    } else if (!meetsUtmeCutoff || !meetsOlevelCutoff) {
+      admissionStatus = 'REJECTED';
     } else if (meetsFinalCutoff) {
       admissionStatus = 'ADMITTED';
     } else {

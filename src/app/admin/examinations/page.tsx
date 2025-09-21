@@ -237,6 +237,7 @@ export default function ExaminationsPage() {
       departmentId: '',
       questionIds: []
     });
+    setEditingExamination(null);
   };
 
   const openEditDialog = (examination: Examination) => {
@@ -252,6 +253,17 @@ export default function ExaminationsPage() {
     });
     setIsDialogOpen(true);
   };
+
+  const openAddDialog = () => {
+    resetForm();
+    setIsDialogOpen(true);
+  };
+
+  // Filter questions based on department selection
+  const filteredQuestions = availableQuestions.filter(question => {
+    if (!formData.departmentId) return true;
+    return question.department.id === formData.departmentId;
+  });
 
   const handleQuestionToggle = (questionId: string) => {
     setFormData(prev => ({
@@ -295,9 +307,12 @@ export default function ExaminationsPage() {
                 {pagination.total} examinations
               </Badge>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) resetForm();
+              }}>
               <DialogTrigger asChild>
-                <Button className="electric-glow">
+                <Button className="electric-glow" onClick={openAddDialog}>
                   <Plus className="mr-2 h-4 w-4" />
                   Create Examination
                 </Button>
@@ -391,28 +406,26 @@ export default function ExaminationsPage() {
                   <div>
                     <Label>Select Questions</Label>
                     <div className="mt-2 space-y-2 max-h-64 overflow-y-auto border rounded-lg p-4">
-                      {availableQuestions
-                        .filter(q => !formData.departmentId || q.department.id === formData.departmentId)
-                        .map((question) => (
-                          <div key={question.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50">
-                            <input
-                              type="checkbox"
-                              checked={formData.questionIds.includes(question.id)}
-                              onChange={() => handleQuestionToggle(question.id)}
-                              className="mt-1"
-                            />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{question.content}</p>
-                              <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-1">
-                                <span>{question.department.name}</span>
-                                <span>•</span>
-                                <span>{question.subject.name}</span>
-                                <span>•</span>
-                                <span>{question.marks} marks</span>
-                              </div>
+                      {filteredQuestions.map((question) => (
+                        <div key={question.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50">
+                          <input
+                            type="checkbox"
+                            checked={formData.questionIds.includes(question.id)}
+                            onChange={() => handleQuestionToggle(question.id)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{question.content}</p>
+                            <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-1">
+                              <span>{question.department.name}</span>
+                              <span>•</span>
+                              <span>{question.subject.name}</span>
+                              <span>•</span>
+                              <span>{question.marks} marks</span>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                      ))}
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">
                       Selected: {formData.questionIds.length} questions
@@ -428,7 +441,10 @@ export default function ExaminationsPage() {
                 )}
 
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button variant="outline" onClick={() => {
+                    setIsDialogOpen(false);
+                    resetForm();
+                  }}>
                     Cancel
                   </Button>
                   <Button 

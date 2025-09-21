@@ -90,6 +90,21 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Handle "general" department - assign to first department (Computer Science)
+    let actualDepartmentId = departmentId;
+    if (departmentId === 'general') {
+      const firstDepartment = await db.department.findFirst({
+        orderBy: { createdAt: 'asc' }
+      });
+      if (!firstDepartment) {
+        return NextResponse.json(
+          { error: 'No departments found' },
+          { status: 400 }
+        );
+      }
+      actualDepartmentId = firstDepartment.id;
+    }
     
     const question = await db.question.create({
       data: {
@@ -98,7 +113,7 @@ export async function POST(request: NextRequest) {
         correctAnswer,
         marks: marks || 1,
         difficulty,
-        departmentId,
+        departmentId: actualDepartmentId,
         subjectId
       },
       include: {

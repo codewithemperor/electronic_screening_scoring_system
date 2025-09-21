@@ -217,6 +217,7 @@ export default function QuestionsPage() {
       departmentId: '',
       subjectId: ''
     });
+    setEditingQuestion(null);
   };
 
   const openEditDialog = (question: Question) => {
@@ -230,6 +231,11 @@ export default function QuestionsPage() {
       departmentId: question.department.id,
       subjectId: question.subject.id
     });
+    setIsDialogOpen(true);
+  };
+
+  const openAddDialog = () => {
+    resetForm();
     setIsDialogOpen(true);
   };
 
@@ -274,9 +280,12 @@ export default function QuestionsPage() {
                 {pagination.total} questions
               </Badge>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
               <DialogTrigger asChild>
-                <Button className="electric-glow">
+                <Button className="electric-glow" onClick={openAddDialog}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Question
                 </Button>
@@ -303,6 +312,7 @@ export default function QuestionsPage() {
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="general">General (All Departments)</SelectItem>
                           {departments.map(dept => (
                             <SelectItem key={dept.id} value={dept.id}>
                               {dept.name}
@@ -416,7 +426,10 @@ export default function QuestionsPage() {
                 )}
 
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button variant="outline" onClick={() => {
+                    setIsDialogOpen(false);
+                    resetForm();
+                  }}>
                     Cancel
                   </Button>
                   <Button 
