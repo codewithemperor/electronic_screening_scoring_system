@@ -141,38 +141,45 @@ export default function CandidateProfilePage() {
       
       const data = await response.json();
       
-      // Calculate performance percentages
-      let examPercentage = 0;
-      let olevelPercentage = 0;
-      let finalScore = 0;
+      // Use database-stored calculated values if available, otherwise calculate
+      let examPercentage = data.examPercentage || 0;
+      let olevelPercentage = data.olevelPercentage || 0;
+      let finalScore = data.finalScore || 0;
       
-      // Calculate exam percentage from test attempts
-      if (data.testAttempts && data.testAttempts.length > 0) {
-        const submittedAttempts = data.testAttempts.filter(
-          (attempt: any) => attempt.status === 'SUBMITTED' || attempt.status === 'COMPLETED'
-        );
+      // If no stored values, calculate them
+      if (!data.examPercentage || !data.olevelPercentage || !data.finalScore) {
+        // Calculate exam percentage from test attempts
+        if (data.testAttempts && data.testAttempts.length > 0) {
+          const submittedAttempts = data.testAttempts.filter(
+            (attempt: any) => attempt.status === 'SUBMITTED' || attempt.status === 'COMPLETED'
+          );
+          
+          if (submittedAttempts.length > 0) {
+            const totalScore = submittedAttempts.reduce(
+              (sum: number, attempt: any) => sum + (attempt.score || 0), 
+              0
+            );
+            const totalPossible = submittedAttempts.reduce(
+              (sum: number, attempt: any) => sum + (attempt.totalMarks || 100), 
+              0
+            );
+            examPercentage = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0;
+          }
+        }
         
-        if (submittedAttempts.length > 0) {
-          const totalScore = submittedAttempts.reduce(
-            (sum: number, attempt: any) => sum + (attempt.score || 0), 
-            0
-          );
-          const totalPossible = submittedAttempts.reduce(
-            (sum: number, attempt: any) => sum + (attempt.totalMarks || 100), 
-            0
-          );
-          examPercentage = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0;
+        // Calculate O'Level percentage
+        if (data.olevelAggregate !== undefined) {
+          olevelPercentage = Math.round((data.olevelAggregate / 45) * 100);
+        }
+        
+        // Calculate final score using department weights
+        const department = data.department;
+        if (department) {
+          const examScore = Math.round(examPercentage * (department.examPercentage || 70) / 100);
+          const olevelScore = Math.round(olevelPercentage * (department.olevelPercentage || 30) / 100);
+          finalScore = examScore + olevelScore;
         }
       }
-      
-      // Calculate O'Level percentage
-      if (data.olevelAggregate !== undefined) {
-        olevelPercentage = Math.round((data.olevelAggregate / 45) * 100);
-      }
-      
-      // Calculate final score (UTME 40%, O'Level 30%, Exam 30%)
-      const utmePercentage = data.utmeScore ? Math.round((data.utmeScore / 400) * 100) : 0;
-      finalScore = Math.round((utmePercentage * 0.4) + (olevelPercentage * 0.3) + (examPercentage * 0.3));
       
       // Add calculated values to data
       const enrichedData = {

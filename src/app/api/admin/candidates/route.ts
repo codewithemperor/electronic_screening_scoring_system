@@ -114,12 +114,14 @@ export async function GET(request: NextRequest) {
       db.candidate.count({ where })
     ]);
     
-    // Calculate final scores for each candidate
+    // Return candidates with their database-stored scores
     const candidatesWithScores = candidates.map(candidate => {
-      const scores = calculateFinalScore(candidate);
       return {
         ...candidate,
-        ...scores
+        // Use database values if available, otherwise calculate
+        olevelPercentage: candidate.olevelPercentage || 0,
+        examPercentage: candidate.examPercentage || 0,
+        finalScore: candidate.finalScore || 0
       };
     });
     
