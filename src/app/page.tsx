@@ -276,7 +276,7 @@ export default function Home() {
       <footer className="py-8 border-t">
         <div className="container mx-auto px-4 text-center">
           <p className="text-muted-foreground">
-            © 2024 Electronic Scoring and Screening System. All rights reserved.
+            © 2025 Electronic Scoring and Screening System. All rights reserved.
           </p>
         </div>
       </footer>

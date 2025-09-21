@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Calculate O'Level percentage score
+    // Calculate O'Level percentage score based on maximum possible marks
     const maxOlevelMarks = 45; // Maximum possible O'Level aggregate (5 subjects × 9 marks each)
     const olevelPercentage = Math.round((olevelAggregate / maxOlevelMarks) * 100);
 
@@ -70,10 +70,9 @@ export async function POST(request: NextRequest) {
 
     // Calculate final score using department weights
     const department = candidate.department;
-    const finalScore = Math.round(
-      (examPercentage * department.examPercentage / 100) +
-      (olevelPercentage * department.olevelPercentage / 100)
-    );
+    const examScore = Math.round(examPercentage * department.examPercentage / 100);
+    const olevelScore = Math.round(olevelPercentage * department.olevelPercentage / 100);
+    const finalScore = examScore + olevelScore;
 
     // Determine admission status
     let admissionStatus: 'NOT_ADMITTED' | 'IN_PROGRESS' | 'ADMITTED' | 'REJECTED';

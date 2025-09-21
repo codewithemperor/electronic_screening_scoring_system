@@ -169,6 +169,23 @@ export default function ExaminationsPage() {
     }
   };
 
+  const fetchQuestionsByDepartment = async (departmentId: string) => {
+    try {
+      const params = new URLSearchParams();
+      if (departmentId && departmentId !== 'all') {
+        params.append('departmentId', departmentId);
+      }
+      
+      const response = await fetch(`/api/admin/questions?${params}`);
+      if (response.ok) {
+        const questionsData = await response.json();
+        setAvailableQuestions(questionsData.questions);
+      }
+    } catch (err) {
+      console.error('Error fetching questions by department:', err);
+    }
+  };
+
   const handleCreateExamination = async () => {
     try {
       const response = await fetch('/api/admin/examinations', {
@@ -354,7 +371,14 @@ export default function ExaminationsPage() {
                       <Label htmlFor="department">Department</Label>
                       <Select 
                         value={formData.departmentId} 
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, departmentId: value }))}
+                        onValueChange={(value) => {
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            departmentId: value,
+                            questionIds: [] // Clear selected questions when department changes
+                          }));
+                          fetchQuestionsByDepartment(value);
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select department" />

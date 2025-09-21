@@ -150,18 +150,45 @@ export default function QuestionsPage() {
   };
 
   const handleCreateQuestion = async () => {
+    // Validate form data before sending
+    if (!formData.content.trim()) {
+      setError('Question content is required');
+      return;
+    }
+    
+    if (!formData.departmentId || formData.departmentId === 'general') {
+      setError('Please select a valid department');
+      return;
+    }
+    
+    if (!formData.subjectId) {
+      setError('Subject is required');
+      return;
+    }
+    
+    if (formData.options.some(option => !option.trim())) {
+      setError('All options must be filled');
+      return;
+    }
+
     try {
+      console.log('Sending form data:', formData); // Debug log
       const response = await fetch('/api/admin/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
 
-      if (!response.ok) throw new Error('Failed to create question');
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || 'Failed to create question');
+      }
 
       await fetchQuestions();
       setIsDialogOpen(false);
       resetForm();
+      setError(null);
     } catch (err) {
       setError(err.message);
       console.error('Create question error:', err);

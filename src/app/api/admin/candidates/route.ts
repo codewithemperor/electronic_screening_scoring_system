@@ -3,9 +3,9 @@ import { db } from '@/lib/db';
 
 // Helper function to calculate final score
 function calculateFinalScore(candidate: any) {
-  // Calculate O'Level percentage score
+  // Calculate O'Level percentage score based on maximum possible marks
   const olevelTotalMarks = candidate.olevelAggregate;
-  const maxOlevelMarks = 45; // Maximum possible O'Level aggregate (9 subjects * 5 marks each)
+  const maxOlevelMarks = 45; // Maximum possible O'Level aggregate (5 subjects × 9 marks each)
   const olevelPercentage = Math.round((olevelTotalMarks / maxOlevelMarks) * 100);
 
   // Calculate exam percentage score
@@ -25,10 +25,9 @@ function calculateFinalScore(candidate: any) {
 
   // Calculate final score using department weights
   const department = candidate.department;
-  const finalScore = Math.round(
-    (examPercentage * (department.examPercentage || 70) / 100) +
-    (olevelPercentage * (department.olevelPercentage || 30) / 100)
-  );
+  const examScore = Math.round(examPercentage * (department.examPercentage || 70) / 100);
+  const olevelScore = Math.round(olevelPercentage * (department.olevelPercentage || 30) / 100);
+  const finalScore = examScore + olevelScore;
 
   return {
     olevelPercentage,
