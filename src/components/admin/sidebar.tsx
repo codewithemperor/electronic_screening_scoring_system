@@ -43,7 +43,7 @@ export function AdminSidebar({ className }: SidebarProps) {
   const handleLogout = () => {
     logout();
     // Redirect to login page after logout
-    window.location.href = '/auth/login';
+    window.location.href = '/admin/login';
   };
 
   return (
