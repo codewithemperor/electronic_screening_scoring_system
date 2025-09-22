@@ -32,7 +32,6 @@ const navigation = [
   { name: 'Examinations', href: '/admin/examinations', icon: FileText },
   { name: 'Candidates', href: '/admin/candidates', icon: Users },
   { name: 'Grading Rules', href: '/admin/grading', icon: Target },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
 export function AdminSidebar({ className }: SidebarProps) {
